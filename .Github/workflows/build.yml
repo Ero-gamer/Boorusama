@@ -3,6 +3,10 @@ name: Build
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,18 +26,17 @@ jobs:
           channel: stable
           flutter-version: 3.27.0
           cache: true
-          
+
       - name: Install dependencies
         run: |
           flutter pub get
-          # The build_runner is essential for Boorusama's code generation
           flutter pub run build_runner build --delete-conflicting-outputs
 
-      - name: Build APK (Armv7a Only)
+      - name: Build Armv7a APK
+        # --target-platform android-arm specifically targets armv7a
         run: |
           flutter build apk --release \
             --target-platform android-arm \
-          # --split-per-abi \
             --dart-define-from-file env/dev.json \
             -t lib/main.dart
 
@@ -41,5 +44,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Boorusama-Armv7a-Unsigned
-          # Path for the specific armv7a build output
+          # Flutter places the specific ABI build here
           path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
