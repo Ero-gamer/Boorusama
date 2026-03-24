@@ -1,35 +1,45 @@
-name: Build Armv7a APK
+name: Build
 
 on:
-  workflow_dispatch: # Allows you to run this manually from the Actions tab
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
+      - name: Clone repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up JDK 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
+          java-version: '17'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.27.0
+          cache: true
 
-      - name: Build Armv7a Release APK
-        run: ./gradlew assembleRelease -Pandroid.bundle.enableUncompressedNativeLibs=false
-        # Note: To strictly limit the ABI output if the project doesn't have 
-        # splits configured, we target the release build.
+      - name: Install dependencies
+        run: |
+          flutter pub get
+          flutter pub run build_runner build --delete-conflicting-outputs
 
-      - name: Upload APK
+      - name: Build APK (Armv7a)
+        run: |
+          # --no-tree-shake-icons is sometimes needed for CI, removed for speed
+          # --split-per-abi creates the specific armv7a file
+          flutter build apk --release --target-platform android-arm --no-pub --dart-define-from-file env/dev.json -t lib/main.dart
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Boorusama-armv7a-unsigned
-          path: app/build/outputs/apk/release/*-release-unsigned.apk
+          name: Boorusama-Armv7a-Unsigned
+          path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
