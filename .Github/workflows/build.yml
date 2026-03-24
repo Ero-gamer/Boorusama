@@ -33,7 +33,7 @@ jobs:
           flutter pub run build_runner build --delete-conflicting-outputs
 
       - name: Build Armv7a APK
-        # --target-platform android-arm specifically targets armv7a
+        # No 'chmod' needed here; Flutter handles the Android sub-folder
         run: |
           flutter build apk --release \
             --target-platform android-arm \
@@ -44,5 +44,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Boorusama-Armv7a-Unsigned
-          # Flutter places the specific ABI build here
           path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
