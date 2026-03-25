@@ -1,4 +1,5 @@
 name: Build
+
 on:
   workflow_dispatch:
 
@@ -27,9 +28,9 @@ jobs:
           cache: true
 
       - name: Prepare environment
+        # We only chmod the scripts that actually exist in your root folder
         run: |
           mkdir -p env
-          # Create blank files to satisfy the script's requirements
           touch .env
           echo '{}' > env/prod.json
           echo '{}' > env/dev.json
@@ -37,17 +38,18 @@ jobs:
           chmod +x build.sh
 
       - name: Force Premium Unlock
-        # This replaces all possible non-premium states with 'premium'
+        # This edits the source code so the app thinks you are already Premium
         run: |
           sed -i "s/PremiumMode.hidden/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/PremiumMode.free/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/_ => PremiumMode.hidden/_ => PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
 
       - name: Generate Code
+        # This triggers the developer's custom generation logic
         run: ./gen.sh
 
       - name: Build Armv7a FOSS APK
-        # -s = FOSS (Strips proprietary bloat/keys)
+        # -s = FOSS (Strips proprietary code/trackers)
         # -f prod = Production flavor
         # --target-platform = armv7a only
         run: |
@@ -55,8 +57,13 @@ jobs:
             --target-platform android-arm \
             --dart-define=IS_FOSS_BUILD=true
 
-      - name: Upload Artifact
+      - name: Organize Artifact
+        run: |
+          mkdir -p final_output
+          cp artifacts/*.apk final_output/Boorusama-Premium-v7a.apk
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Boorusama-FOSS-Premium-v7a
-          path: artifacts/*.apk
+          path: final_output/Boorusama-Premium-v7a.apk
