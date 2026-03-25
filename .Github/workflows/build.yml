@@ -1,4 +1,4 @@
-name: Boorusama Premium APK
+name: Boorusama Premium APK (Default Flavor)
 
 on:
   workflow_dispatch:
@@ -16,18 +16,24 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: MANUALLY INSTALL FLUTTER 3.41 / DART 3.11
-        # This bypasses the pre-installed 3.6.0 runner version entirely
-        run: |
-          git clone https://github.com/flutter/flutter.git -b stable $HOME/flutter
-          echo "$HOME/flutter/bin" >> $GITHUB_PATH
-          echo "$HOME/flutter/bin/cache/dart-sdk/bin" >> $GITHUB_PATH
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.41.0' 
+          cache: true
 
-      - name: Force All Pubspecs to 3.11
-        # This ensures every sub-package matches your target version
+      - name: Version Audit & Doctor
+        # This will tell us once and for all if the runner is lying about the SDK
         run: |
-          find . -name "pubspec.yaml" -exec sed -i 's/sdk: .*/sdk: "^3.11.0"/g' {} +
-          find . -name "pubspec.yaml" -exec sed -i 's/flutter: .*/flutter: "^3.41.0"/g' {} +
+          flutter --version
+          flutter doctor
+
+      - name: Global Pubspec Patch
+        # We target EVERY pubspec in the workspace to stop the version nagging
+        run: |
+          find . -name "pubspec.yaml" -exec sed -i 's/sdk: .*/sdk: ">=3.11.0 <4.0.0"/g' {} +
+          find . -name "pubspec.yaml" -exec sed -i 's/flutter: .*/flutter: ">=3.41.0"/g' {} +
           find . -name "pubspec.lock" -delete
           mkdir -p env
           touch .env
@@ -35,7 +41,8 @@ jobs:
           chmod +x gen.sh
           chmod +x build.sh
 
-      - name: Inject Premium Status
+      - name: Hard-Code Premium Status
+        # Bypasses the payment check logic in the source code
         run: |
           sed -i "s/PremiumMode.hidden/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/PremiumMode.free/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
@@ -47,14 +54,16 @@ jobs:
       - name: Run Code Generation
         run: ./gen.sh
 
-      - name: Build FOSS-Premium Armv7a
+      - name: Build Standard Premium Armv7a
+        # NOTICE: We REMOVED the -s flag. This is now the full "Default" flavor.
+        # We still target armv7a for your Android hardware.
         run: |
-          ./build.sh apk --release -f prod -s \
+          ./build.sh apk --release -f prod \
             --target-platform android-arm \
-            --dart-define=IS_FOSS_BUILD=true
+            --dart-define=IS_FOSS_BUILD=false
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Boorusama-Premium-v7a
+          name: Boorusama-Premium-Default-v7a
           path: artifacts/*.apk
