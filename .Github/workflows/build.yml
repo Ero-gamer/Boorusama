@@ -16,19 +16,19 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          flutter-version: '3.41.0' 
-          cache: true
-
-      - name: Force Global Compatibility
-        # This deletes old locks and forces every package to accept any 3.x SDK
+      - name: MANUALLY INSTALL FLUTTER 3.41 / DART 3.11
+        # This bypasses the pre-installed 3.6.0 runner version entirely
         run: |
+          git clone https://github.com/flutter/flutter.git -b stable $HOME/flutter
+          echo "$HOME/flutter/bin" >> $GITHUB_PATH
+          echo "$HOME/flutter/bin/cache/dart-sdk/bin" >> $GITHUB_PATH
+
+      - name: Force All Pubspecs to 3.11
+        # This ensures every sub-package matches your target version
+        run: |
+          find . -name "pubspec.yaml" -exec sed -i 's/sdk: .*/sdk: "^3.11.0"/g' {} +
+          find . -name "pubspec.yaml" -exec sed -i 's/flutter: .*/flutter: "^3.41.0"/g' {} +
           find . -name "pubspec.lock" -delete
-          find . -name "pubspec.yaml" -exec sed -i 's/sdk: .*/sdk: ">=3.0.0 <4.0.0"/g' {} +
-          find . -name "pubspec.yaml" -exec sed -i 's/flutter: .*/flutter: ">=3.0.0"/g' {} +
           mkdir -p env
           touch .env
           echo '{}' > env/prod.json
@@ -41,9 +41,7 @@ jobs:
           sed -i "s/PremiumMode.free/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/_ => PremiumMode.hidden/_ => PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
 
-      - name: Resolve Workspace Dependencies
-        # This is where the magic happens; with the locks gone and 
-        # constraints lowered, it will finally stop complaining.
+      - name: Resolve Workspace
         run: flutter pub get
 
       - name: Run Code Generation
