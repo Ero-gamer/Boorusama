@@ -1,69 +1,56 @@
-name: Build
+name: Boorusama-Premium-Final
 
 on:
-  workflow_dispatch:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_dispatch: # This allows you to press the button manually
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Clone repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: 3.27.0
           cache: true
 
-      - name: Prepare environment
-        # We only chmod the scripts that actually exist in your root folder
+      - name: Prepare Workspace
+        # We ONLY touch the scripts in the root. NO gradlew.
         run: |
           mkdir -p env
           touch .env
           echo '{}' > env/prod.json
-          echo '{}' > env/dev.json
           chmod +x gen.sh
           chmod +x build.sh
 
-      - name: Force Premium Unlock
-        # This edits the source code so the app thinks you are already Premium
+      - name: Crack Premium Logic
+        # This replaces 'free'/'hidden' with 'premium' in the source
         run: |
           sed -i "s/PremiumMode.hidden/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/PremiumMode.free/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/_ => PremiumMode.hidden/_ => PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
 
-      - name: Generate Code
-        # This triggers the developer's custom generation logic
+      - name: Generate Boilerplate
         run: ./gen.sh
 
-      - name: Build Armv7a FOSS APK
-        # -s = FOSS (Strips proprietary code/trackers)
-        # -f prod = Production flavor
-        # --target-platform = armv7a only
+      - name: Build Armv7a APK
+        # We use -s for FOSS (no trackers) and target armv7a
         run: |
           ./build.sh apk --release -f prod -s \
             --target-platform android-arm \
             --dart-define=IS_FOSS_BUILD=true
 
-      - name: Organize Artifact
-        run: |
-          mkdir -p final_output
-          cp artifacts/*.apk final_output/Boorusama-Premium-v7a.apk
-
-      - name: Upload APK
+      - name: Upload Finished APK
         uses: actions/upload-artifact@v4
         with:
-          name: Boorusama-FOSS-Premium-v7a
-          path: final_output/Boorusama-Premium-v7a.apk
+          name: Boorusama-Premium-v7a
+          path: artifacts/*.apk
