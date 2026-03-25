@@ -20,11 +20,11 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          # Using the latest stable version to avoid "SDK version" errors
-          flutter-version: 3.29.0 
+          # Using the actual current stable version
+          flutter-version: 3.41.0
           cache: true
 
-      - name: Setup Workspace
+      - name: Setup Environment Files
         run: |
           mkdir -p env
           touch .env
@@ -32,33 +32,28 @@ jobs:
           chmod +x gen.sh
           chmod +x build.sh
 
-      - name: Crack Premium Code
+      - name: Inject Premium Status
         run: |
           sed -i "s/PremiumMode.hidden/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/PremiumMode.free/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/_ => PremiumMode.hidden/_ => PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
 
-      - name: Bootstrap Dependencies
-        # This is the CRITICAL FIX: It fetches dependencies for all sub-packages
-        # specifically 'codegen' and 'booru_clients' so the tools can see them.
-        run: |
-          flutter pub get
-          cd packages/i18n && flutter pub get
-          cd ../booru_clients && flutter pub get
-          cd ../..
+      - name: Resolve Workspace Dependencies
+        # This triggers the workspace-aware resolution for all 'packages/'
+        run: flutter pub get
 
       - name: Run Code Generation
-        # Now that dependencies are linked, gen.sh will find 'yaml' and 'codegen'
+        # This calls the scripts that were failing to find 'codegen' and 'yaml'
         run: ./gen.sh
 
-      - name: Compile Armv7a APK
-        # We target the 'prod' flavor with FOSS stripping
+      - name: Build FOSS-Premium Armv7a
+        # -s for FOSS (privacy), -f prod for production flavor
         run: |
           ./build.sh apk --release -f prod -s \
             --target-platform android-arm \
             --dart-define=IS_FOSS_BUILD=true
 
-      - name: Upload Premium APK
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Boorusama-Premium-v7a
