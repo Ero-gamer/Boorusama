@@ -1,0 +1,58 @@
+name: Boorusama Premium APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.27.0
+          cache: true
+
+      - name: Setup Scripts
+        # We ONLY touch gen.sh and build.sh. 
+        # We do NOT touch gradlew; Flutter generates it automatically.
+        run: |
+          mkdir -p env
+          touch .env
+          echo '{}' > env/prod.json
+          chmod +x gen.sh
+          chmod +x build.sh
+
+      - name: Crack Premium Code
+        # This replaces the 'free' and 'hidden' logic with 'premium'
+        run: |
+          sed -i "s/PremiumMode.hidden/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
+          sed -i "s/PremiumMode.free/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
+          sed -i "s/_ => PremiumMode.hidden/_ => PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
+
+      - name: Run Code Generation
+        run: ./gen.sh
+
+      - name: Compile Armv7a APK
+        # -s: FOSS mode (strips proprietary trackers)
+        # -f prod: Production flavor
+        run: |
+          ./build.sh apk --release -f prod -s \
+            --target-platform android-arm \
+            --dart-define=IS_FOSS_BUILD=true
+
+      - name: Store Premium APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Boorusama-Premium-v7a
+          path: artifacts/*.apk
