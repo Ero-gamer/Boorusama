@@ -1,16 +1,16 @@
-name: Boorusama-Premium-Final
+name: Boorusama Premium APK
 
 on:
-  workflow_dispatch: # This allows you to press the button manually
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -20,11 +20,11 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: 3.27.0
+          # Using the latest stable version to avoid "SDK version" errors
+          flutter-version: 3.29.0 
           cache: true
 
-      - name: Prepare Workspace
-        # We ONLY touch the scripts in the root. NO gradlew.
+      - name: Setup Workspace
         run: |
           mkdir -p env
           touch .env
@@ -32,24 +32,33 @@ jobs:
           chmod +x gen.sh
           chmod +x build.sh
 
-      - name: Crack Premium Logic
-        # This replaces 'free'/'hidden' with 'premium' in the source
+      - name: Crack Premium Code
         run: |
           sed -i "s/PremiumMode.hidden/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/PremiumMode.free/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
           sed -i "s/_ => PremiumMode.hidden/_ => PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
 
-      - name: Generate Boilerplate
+      - name: Bootstrap Dependencies
+        # This is the CRITICAL FIX: It fetches dependencies for all sub-packages
+        # specifically 'codegen' and 'booru_clients' so the tools can see them.
+        run: |
+          flutter pub get
+          cd packages/i18n && flutter pub get
+          cd ../booru_clients && flutter pub get
+          cd ../..
+
+      - name: Run Code Generation
+        # Now that dependencies are linked, gen.sh will find 'yaml' and 'codegen'
         run: ./gen.sh
 
-      - name: Build Armv7a APK
-        # We use -s for FOSS (no trackers) and target armv7a
+      - name: Compile Armv7a APK
+        # We target the 'prod' flavor with FOSS stripping
         run: |
           ./build.sh apk --release -f prod -s \
             --target-platform android-arm \
             --dart-define=IS_FOSS_BUILD=true
 
-      - name: Upload Finished APK
+      - name: Upload Premium APK
         uses: actions/upload-artifact@v4
         with:
           name: Boorusama-Premium-v7a
