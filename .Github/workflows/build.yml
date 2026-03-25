@@ -1,5 +1,4 @@
 name: Build
-
 on:
   workflow_dispatch:
 
@@ -27,21 +26,37 @@ jobs:
           flutter-version: 3.27.0
           cache: true
 
-      - name: Install dependencies
+      - name: Prepare environment
         run: |
-          flutter pub get
-          flutter pub run build_runner build --delete-conflicting-outputs
+          mkdir -p env
+          # Create blank files to satisfy the script's requirements
+          touch .env
+          echo '{}' > env/prod.json
+          echo '{}' > env/dev.json
+          chmod +x gen.sh
+          chmod +x build.sh
 
-      - name: Build Armv7a APK
-        # No 'chmod' needed here; Flutter handles the Android sub-folder
+      - name: Force Premium Unlock
+        # This replaces all possible non-premium states with 'premium'
         run: |
-          flutter build apk --release \
+          sed -i "s/PremiumMode.hidden/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
+          sed -i "s/PremiumMode.free/PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
+          sed -i "s/_ => PremiumMode.hidden/_ => PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
+
+      - name: Generate Code
+        run: ./gen.sh
+
+      - name: Build Armv7a FOSS APK
+        # -s = FOSS (Strips proprietary bloat/keys)
+        # -f prod = Production flavor
+        # --target-platform = armv7a only
+        run: |
+          ./build.sh apk --release -f prod -s \
             --target-platform android-arm \
-            --dart-define-from-file env/dev.json \
-            -t lib/main.dart
+            --dart-define=IS_FOSS_BUILD=true
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Boorusama-Armv7a-Unsigned
-          path: build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          name: Boorusama-FOSS-Premium-v7a
+          path: artifacts/*.apk
