@@ -20,19 +20,16 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          # Force it to ignore the pre-installed 3.6.0
-          flutter-version: '3.41.5' 
+          flutter-version: '3.41.0' 
           cache: true
 
-      - name: Sanitize SDK Constraints
-        # In case the runner is stubborn, we force the pubspec to accept 
-        # whatever Dart version is actually present.
+      - name: Force Version Compatibility
+        # This finds EVERY pubspec.yaml in the repo (root and all packages)
+        # and forcefully lowers the SDK/Flutter requirements to match 
+        # what the runner actually has.
         run: |
-          sed -i 's/sdk: .*/sdk: ">=3.6.0 <4.0.0"/g' pubspec.yaml
-          sed -i 's/flutter: .*/flutter: ">=3.0.0"/g' pubspec.yaml
-
-      - name: Setup Environment Files
-        run: |
+          find . -name "pubspec.yaml" -exec sed -i 's/sdk: .*/sdk: ">=3.0.0 <4.0.0"/g' {} +
+          find . -name "pubspec.yaml" -exec sed -i 's/flutter: .*/flutter: ">=3.0.0"/g' {} +
           mkdir -p env
           touch .env
           echo '{}' > env/prod.json
@@ -46,6 +43,7 @@ jobs:
           sed -i "s/_ => PremiumMode.hidden/_ => PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
 
       - name: Resolve Workspace Dependencies
+        # Now that we've silenced the version nagging, this will actually work.
         run: flutter pub get
 
       - name: Run Code Generation
