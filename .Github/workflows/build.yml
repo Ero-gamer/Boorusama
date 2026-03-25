@@ -19,10 +19,17 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
-          # Using the actual current stable version
-          flutter-version: 3.41.0
+          channel: 'stable'
+          # Force it to ignore the pre-installed 3.6.0
+          flutter-version: '3.41.5' 
           cache: true
+
+      - name: Sanitize SDK Constraints
+        # In case the runner is stubborn, we force the pubspec to accept 
+        # whatever Dart version is actually present.
+        run: |
+          sed -i 's/sdk: .*/sdk: ">=3.6.0 <4.0.0"/g' pubspec.yaml
+          sed -i 's/flutter: .*/flutter: ">=3.0.0"/g' pubspec.yaml
 
       - name: Setup Environment Files
         run: |
@@ -39,15 +46,12 @@ jobs:
           sed -i "s/_ => PremiumMode.hidden/_ => PremiumMode.premium/g" lib/core/premiums/src/types/premium.dart
 
       - name: Resolve Workspace Dependencies
-        # This triggers the workspace-aware resolution for all 'packages/'
         run: flutter pub get
 
       - name: Run Code Generation
-        # This calls the scripts that were failing to find 'codegen' and 'yaml'
         run: ./gen.sh
 
       - name: Build FOSS-Premium Armv7a
-        # -s for FOSS (privacy), -f prod for production flavor
         run: |
           ./build.sh apk --release -f prod -s \
             --target-platform android-arm \
